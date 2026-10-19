@@ -1,0 +1,9 @@
+build/
+dist/
+_skbuild/
+*.egg-info/
+__pycache__/
+*.so
+*.pyd
+.pytest_cache/
+*.extxyz
