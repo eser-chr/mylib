@@ -309,7 +309,7 @@ def trajectory_info(frames: List[Atoms]) -> Dict[str, object]:
 def _discover_cooldown_h5(sim_dir: Path) -> List[Path]:
     """Return *_T{temp}.h5 files sorted by descending temperature."""
     h5_files: List[Path] = sorted(
-        sim_dir.glob("*_T*.h5"),
+        sim_dir.glob("*T*.h5"),
         key=_parse_temperature,
         reverse=True,
     )
@@ -317,7 +317,11 @@ def _discover_cooldown_h5(sim_dir: Path) -> List[Path]:
         raise FileNotFoundError(f"No *_T*.h5 files found in {sim_dir}")
     return h5_files
 
+import re
 
 def _parse_temperature(h5_path: Path) -> int:
-    """Extract the integer temperature from a filename like ``tag_T1000.h5``."""
-    return int(h5_path.stem.split("_T")[-1])
+    """Extract the integer temperature from a filename like ``tag_T1000.h5`` or ``T1000.h5``."""
+    m = re.search(r"T(\d+)$", h5_path.stem)
+    if m is None:
+        raise ValueError(f"No temperature found in {h5_path.name}")
+    return int(m.group(1))

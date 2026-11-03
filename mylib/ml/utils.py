@@ -112,6 +112,7 @@ def calculator_from_checkpoint(
     template_model_path: str | Path,
     device: str = "cuda",
     default_dtype: str = "float64",
+    enable_cueq=True
     out_path=None,
 ) -> MACECalculator:
 
@@ -130,5 +131,5 @@ def calculator_from_checkpoint(
         )
 
     return MACECalculator(
-        models=model, device=device, default_dtype=default_dtype, enable_cueq=True
+        models=model, device=device, default_dtype=default_dtype, enable_cueq=enable_cueq
     )

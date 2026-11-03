@@ -272,3 +272,67 @@ def get_uncertain_snapshots(md:List[Atoms], s_mean):
     index = np.argwhere(partial_sorted_sum>=target)[0][0]
     collected_snapshots = [md[i] for i in I[:index]]
     return collected_snapshots, index
+
+
+
+def compare_calculator(calc: MACECalculator, DB: List[Atoms]) -> dict:
+    """Compares a MACE calculator with the reference forces of a database.
+    
+    Assumes each Atoms object in DB has reference forces stored in arrays.get_forces()
+    or info/arrays dicts. Computes RMSE and MAE over all atoms and frames.
+    """
+    sq_errors = []
+    abs_errors = []
+
+    for frame in DB:
+        ref_forces = frame.arrays["REF_forces"]  # adjust key as needed
+        frame.calc = calc
+        pred_forces = calc.get_forces(frame)
+
+        diff = pred_forces - ref_forces          # (N_atoms, 3)
+        sq_errors.append((diff ** 2).sum(axis=1))   # per-atom squared norm? No — per component
+        abs_errors.append(np.abs(diff).flatten())
+
+    sq_errors = np.concatenate(sq_errors)
+    abs_errors = np.concatenate(abs_errors)
+
+    return {
+        "rmse_f": np.sqrt(sq_errors.mean()),
+        "mae_f": abs_errors.mean(),
+        "n_frames": len(DB),
+        "n_atoms_total": len(sq_errors),
+    }
+
+
+def compare_calculators(calc_a: MACECalculator, calc_b: MACECalculator, DB: List[Atoms]) -> dict:
+    """Compares two calculators on a dataset by computing RMSE of their predicted forces.
+    
+    Does not require reference forces — compares calc_a vs calc_b directly.
+    """
+    sq_errors = []
+    abs_errors = []
+
+    for frame in DB:
+        frame_a = frame.copy()
+        frame_b = frame.copy()
+
+        frame_a.calc = calc_a
+        frame_b.calc = calc_b
+
+        forces_a = calc_a.get_forces(frame_a)
+        forces_b = calc_b.get_forces(frame_b)
+
+        diff = forces_a - forces_b               # (N_atoms, 3)
+        sq_errors.append((diff ** 2).flatten())
+        abs_errors.append(np.abs(diff).flatten())
+
+    sq_errors = np.concatenate(sq_errors)
+    abs_errors = np.concatenate(abs_errors)
+
+    return {
+        "rmse_f": np.sqrt(sq_errors.mean()),
+        "mae_f": abs_errors.mean(),
+        "n_frames": len(DB),
+        "n_atoms_total": len(sq_errors),
+    }
+
