@@ -112,16 +112,38 @@ def calculator_from_checkpoint(
     template_model_path: str | Path,
     device: str = "cuda",
     default_dtype: str = "float64",
-    enable_cueq=True
+    enable_cueq=True,
     out_path=None,
 ) -> MACECalculator:
 
     import torch
     from mace.calculators import MACECalculator
+    from mace.cli.convert_e3nn_cueq import run as e3nn_to_cueq
+    from mace.cli.convert_cueq_e3nn import run as cueq_to_e3nn
 
     model = torch.load(template_model_path, map_location=device, weights_only=False)
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    model.load_state_dict(ckpt["model"], strict=True)
+    state = ckpt["model"]
+
+    # checkpoint saved from a cuEq model: load it into a cuEq copy, then convert back
+    is_cueq = any(".graphs." in k for k in state)
+    if is_cueq:
+        model = e3nn_to_cueq(model, device=device)
+
+    # newer MACE stores avg_num_neighbors in the state dict: copy it onto the model
+    for i, inter in enumerate(model.interactions):
+        key = f"interactions.{i}.avg_num_neighbors"
+        if key in state:
+            inter.avg_num_neighbors = float(state.pop(key))
+
+    # newer cuequivariance adds ".fallback." constants that older checkpoints lack
+    missing, unexpected = model.load_state_dict(state, strict=False)
+    bad = [k for k in missing if ".fallback." not in k]
+    if bad or unexpected:
+        raise RuntimeError(f"Missing: {bad}\nUnexpected: {unexpected}")
+
+    if is_cueq:
+        model = cueq_to_e3nn(model, device=device)
     model = model.to(device)
 
     if out_path is not None:

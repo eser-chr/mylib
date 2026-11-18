@@ -5,6 +5,14 @@ from ase import Atoms
 import freud
 
 
+def gzip_file(path):
+    path = Path(path)
+    gz = path.with_name(path.name + ".gz")
+    with open(path, "rb") as src, gzip.open(gz, "wb") as dst:
+        shutil.copyfileobj(src, dst)
+    path.unlink()
+    return gz
+
 def get_pair_cn_with_com_cutoff(
     frames: List[Atoms], 
     cutoff: float, 
