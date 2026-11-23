@@ -24,6 +24,14 @@ class ForceFilter(Filter):
         return np.linalg.norm(forces, axis=1).max() < self.threshold
 
 
+class ElementFilter(Filter):
+    def __init__(self, elements: list[str]) -> None:
+        self.elements = set(elements)
+
+    def __call__(self, structure: Atoms) -> bool:
+        return set(structure.get_chemical_symbols()) <= self.elements
+
+
 @dataclass(frozen=True)
 class Split:
     val: float = 0.1
@@ -57,7 +65,14 @@ def create_dirs(
         atoms_all = read(path, index=":", format="extxyz")
         kept = [at for at in atoms_all if all(f(at) for f in filters)]
         if len(kept) < 3:
-            raise ValueError(f"{path}: only {len(kept)} of {len(atoms_all)} structures left after filtering")
+            logging.warning(
+                f"Skipping {path}: only {len(kept)} of {len(atoms_all)} structures left after filtering"
+            )
+            continue
+
+        # tag each structure with its source file, so MACE reports errors per file
+        for at in kept:
+            at.info["config_type"] = path.stem
 
         # test first, then validation (as a fraction of the remainder, so it is split.val of the total)
         rest, test = train_test_split(kept, test_size=split.test, random_state=split_seed)
